@@ -9,7 +9,7 @@
   "author": "Kristian Antonsen",
   "license": "Apache-2.0",
   "dependencies": {
-    "json0-ot-diff": "^1.0.0",
+    "json0-ot-diff": "^1.0.1",
     "jsonml-parse": "^1.0.0",
     "jsonml-tools": "git+http://github.com/cklokmose/jsonml-tools.git#master",
     "optimist": "^0.6.1",

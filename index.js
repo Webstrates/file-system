@@ -1,4 +1,6 @@
-var WebSocketClient = require('websocket').w3cwebsocket;
+"use strict";
+
+var W3WebSocket = require('websocket').w3cwebsocket;
 var argv = require("optimist").argv;
 var fs = require("fs");
 var sharedb = require("sharedb/lib/client");
@@ -6,7 +8,6 @@ var jsonmlParse = require("jsonml-parse");
 var jsondiff = require("json0-ot-diff");
 var jsonml = require('jsonml-tools');
 
-var websocket = new WebSocketClient("ws://localhost:7007/ws");
 var webstrateId = argv.id || "contenteditable";
 var MOUNT_PATH = "./documents/";
 var MOUNT_POINT = MOUNT_PATH + webstrateId;
@@ -17,27 +18,53 @@ try {
 	fs.mkdirSync(MOUNT_PATH);
 }
 
-var conn = new sharedb.Connection(websocket);
+var conn;
 
-// We're sending our own events over the websocket connection that we don't want to mess up with ShareDB, so we filter
-// them out.
-var sdbMessageHandler = websocket.onmessage;
-websocket.onmessage = function(event) {
-	var data = JSON.parse(event.data);
-	if (!data.wa) {
-		sdbMessageHandler(event);
-	}
+var connectToWebsocket = function() {
+	console.log("Connecting...");
+	var websocket = new W3WebSocket("ws://localhost:7007/ws");
+
+	conn = new sharedb.Connection(websocket);
+	
+	var sdbOpenHandler = websocket.onopen;
+	websocket.onopen = function(event) {
+		console.log("Connected.");
+		sdbOpenHandler(event);
+	}.bind(this);
+
+	// We're sending our own events over the websocket connection that we don't want to mess up with ShareDB, so we filter
+	// them out.
+	var sdbMessageHandler = websocket.onmessage;
+	websocket.onmessage = function(event) {
+		var data = JSON.parse(event.data);
+		if (!data.wa) {
+			sdbMessageHandler(event);
+		}
+	}.bind(this);
+
+	var sdbCloseHandler = websocket.onclose;
+	websocket.onclose = function(event) {
+		console.log("Connection closed, attempting to reconnect.");
+		setTimeout(function() {
+			connectToWebsocket();
+		}, 1000);
+		sdbCloseHandler(event);
+	}.bind(this);
+
+	var sdbErrorHandler = websocket.onerror;
+	websocket.onerror = function(event) {
+		console.log("Connection error.");
+		sdbErrorHandler(event);
+	}.bind(this);
 };
+
+connectToWebsocket();
 
 var doc = conn.get("webstrates", webstrateId);
 
 var watcher, readTimeout, oldHtml;
 
 doc.on('op', function onOp(ops, source) {
-	// If there's a source, it's ouw own op. We don't want to trigger on our own ops.
-	if (source) {
-		return;
-	}
 	writeDocument(jsonToHtml(doc.data));
 });
 
@@ -100,7 +127,7 @@ function fileChangeListener(event, filename) {
 	}, 500);
 
 	if (event === "rename") {
-		throw "Don't rename the webstrates file!";
+		throw "Don't move/rename/delete the webstrates file!";
 	}
 
 	var newHtml = fs.readFileSync(MOUNT_POINT, "utf8");
@@ -113,12 +140,17 @@ function fileChangeListener(event, filename) {
 		var normalizedOldJson = normalize(doc.data);
 		var normalizedNewJson = normalize(newJson);
 
-		doWhilePaused(function() {
-			writeDocument(jsonToHtml(normalizedNewJson));
-		})
-
-		var ops = jsondiff(normalizedOldJson, normalizedNewJson);
-		doc.submitOp(ops);
+		//var ops = jsondiff(normalizedOldJson, normalizedNewJson);
+		var ops = jsondiff(doc.data, normalizedNewJson);
+		console.log("---");
+		console.log(normalizedOldJson);
+		console.log(ops);
+		console.log("---");
+		doc.submitOp(ops, function() {
+			doWhilePaused(function() {
+				writeDocument(jsonToHtml(doc.data));
+			})
+		});
 	});
 }
 

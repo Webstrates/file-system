@@ -3,6 +3,7 @@
 var W3WebSocket = require('websocket').w3cwebsocket;
 var argv = require("optimist").argv;
 var fs = require("fs");
+var chokidar = require("chokidar");
 var sharedb = require("sharedb/lib/client");
 var jsonmlParse = require("jsonml-parse");
 var jsondiff = require("json0-ot-diff");
@@ -18,21 +19,22 @@ try {
 	fs.mkdirSync(MOUNT_PATH);
 }
 
-var conn;
+var watcher, oldHtml, doc;
 
-var connectToWebsocket = function() {
+var setup = function() {
+	oldHtml = "";
 	console.log("Connecting...");
 	var websocket = new W3WebSocket("ws://localhost:7007/ws");
 
-	conn = new sharedb.Connection(websocket);
-	
+	var conn = new sharedb.Connection(websocket);
+
 	var sdbOpenHandler = websocket.onopen;
 	websocket.onopen = function(event) {
 		console.log("Connected.");
 		sdbOpenHandler(event);
-	}.bind(this);
+	};
 
-	// We're sending our own events over the websocket connection that we don't want to mess up with ShareDB, so we filter
+	// We're sending our own events over the websocket connection that we don't want messing with ShareDB, so we filter
 	// them out.
 	var sdbMessageHandler = websocket.onmessage;
 	websocket.onmessage = function(event) {
@@ -40,45 +42,48 @@ var connectToWebsocket = function() {
 		if (!data.wa) {
 			sdbMessageHandler(event);
 		}
-	}.bind(this);
+	};
 
 	var sdbCloseHandler = websocket.onclose;
 	websocket.onclose = function(event) {
 		console.log("Connection closed, attempting to reconnect.");
 		setTimeout(function() {
-			connectToWebsocket();
+			setup();
 		}, 1000);
 		sdbCloseHandler(event);
-	}.bind(this);
+	};
 
 	var sdbErrorHandler = websocket.onerror;
 	websocket.onerror = function(event) {
 		console.log("Connection error.");
 		sdbErrorHandler(event);
-	}.bind(this);
+	};
+
+	doc = conn.get("webstrates", webstrateId);
+
+	doc.on('op', function onOp(ops, source) {
+		var newHtml = jsonToHtml(doc.data)
+		if (newHtml === oldHtml) {
+			return;
+		}
+		writeDocument(jsonToHtml(doc.data));
+	});
+
+	doc.subscribe(function(err) {
+		if (err) {
+			throw err;
+		}
+		writeDocument(jsonToHtml(doc.data));
+		watcher = chokidar.watch(MOUNT_POINT);
+		watcher.on('change', fileChangeListener);
+	});
 };
 
-connectToWebsocket();
-
-var doc = conn.get("webstrates", webstrateId);
-
-var watcher, readTimeout, oldHtml;
-
-doc.on('op', function onOp(ops, source) {
-	writeDocument(jsonToHtml(doc.data));
-});
-
-doc.subscribe(function(err) {
-	if (err) {
-		throw err;
-	}
-	writeDocument(jsonToHtml(doc.data));
-	watcher = fs.watch(MOUNT_POINT, fileChangeListener);
-});
+setup();
 
 // All elements must have an attribute list, unless the element is a string
 function normalize(json) {
-	if (typeof json === "undefined") {
+	if (typeof json === "undefined" || json.length === 0) {
 		return [];
 	}
 
@@ -106,8 +111,12 @@ function normalize(json) {
 }
 
 function jsonToHtml(json) {
-	return jsonml.toXML(json, ["area", "base", "br", "col", "embed", "hr", "img", "input",
-		"keygen", "link", "menuitem", "meta", "param", "source", "track", "wbr"]);
+	try {
+		return jsonml.toXML(json, ["area", "base", "br", "col", "embed", "hr", "img", "input",
+			"keygen", "link", "menuitem", "meta", "param", "source", "track", "wbr"]);		
+	} catch (e) {
+		console.log("Unable to parse JsonML");
+	}
 }
 
 function htmlToJson(html, callback) {
@@ -117,19 +126,7 @@ function htmlToJson(html, callback) {
 	});
 }
 
-function fileChangeListener(event, filename) {
-	if (readTimeout) {
-		return;
-	}
-
-	readTimeout = setTimeout(function() {
-		readTimeout = null;
-	}, 500);
-
-	if (event === "rename") {
-		throw "Don't move/rename/delete the webstrates file!";
-	}
-
+function fileChangeListener(path, stats) {
 	var newHtml = fs.readFileSync(MOUNT_POINT, "utf8");
 	if (newHtml === oldHtml) {
 		return;
@@ -139,25 +136,22 @@ function fileChangeListener(event, filename) {
 	htmlToJson(newHtml, function(newJson) {
 		var normalizedOldJson = normalize(doc.data);
 		var normalizedNewJson = normalize(newJson);
-
-		//var ops = jsondiff(normalizedOldJson, normalizedNewJson);
 		var ops = jsondiff(doc.data, normalizedNewJson);
-		console.log("---");
-		console.log(normalizedOldJson);
-		console.log(ops);
-		console.log("---");
-		doc.submitOp(ops, function() {
-			doWhilePaused(function() {
-				writeDocument(jsonToHtml(doc.data));
-			})
-		});
+		try {
+			doc.submitOp(ops);
+		} catch (e) {
+			console.log("Invalid document, recreating");
+			var op = [{ "p": [], "oi": [ "html", {}, [ "body", {} ]]}];
+			doc.submitOp(op);
+		}
 	});
 }
 
 function doWhilePaused(callback) {
-	if (watcher) watcher.close();
+	//if (watcher) watcher.close();
 	callback();
-	watcher = fs.watch(MOUNT_POINT, fileChangeListener);
+	//watcher = chokidar.watch(MOUNT_POINT);
+	//watcher.on('change', fileChangeListener);
 }
 
 function writeDocument(html) {

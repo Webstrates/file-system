@@ -73,6 +73,14 @@ var setup = function() {
 		if (err) {
 			throw err;
 		}
+
+		if (!doc.type) {
+			console.log("Document doesn't exist on server, creating it.");
+			doc.create('json0');
+			var op = [{ "p": [], "oi": [ "html", {}, [ "body", {} ]]}];
+			doc.submitOp(op);
+		}
+
 		writeDocument(jsonToHtml(doc.data));
 		watcher = chokidar.watch(MOUNT_POINT);
 		watcher.on('change', fileChangeListener);
@@ -121,7 +129,7 @@ function jsonToHtml(json) {
 		return jsonml.toXML(json, ["area", "base", "br", "col", "embed", "hr", "img", "input",
 			"keygen", "link", "menuitem", "meta", "param", "source", "track", "wbr"]);		
 	} catch (e) {
-		console.log("Unable to parse JsonML");
+		console.log("Unable to parse JsonML.");
 	}
 }
 
@@ -146,7 +154,7 @@ function fileChangeListener(path, stats) {
 		try {
 			doc.submitOp(ops);
 		} catch (e) {
-			console.log("Invalid document, recreating");
+			console.log("Invalid document, rebuilding.");
 			var op = [{ "p": [], "oi": [ "html", {}, [ "body", {} ]]}];
 			doc.submitOp(op);
 		}

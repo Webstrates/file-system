@@ -19,12 +19,12 @@ try {
 	fs.mkdirSync(MOUNT_PATH);
 }
 
-var watcher, oldHtml, doc;
+var websocket, doc, watcher, oldHtml;
 
 var setup = function() {
 	oldHtml = "";
 	console.log("Connecting...");
-	var websocket = new W3WebSocket("ws://localhost:7007/ws");
+	var websocket = new W3WebSocket("ws://localhost:7007/ws/");
 
 	var conn = new sharedb.Connection(websocket);
 
@@ -80,6 +80,12 @@ var setup = function() {
 };
 
 setup();
+
+process.on('SIGINT', function() {
+	fs.unlinkSync(MOUNT_POINT);
+	doc.destroy();
+	process.exit();
+});
 
 // All elements must have an attribute list, unless the element is a string
 function normalize(json) {

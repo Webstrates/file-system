@@ -24,7 +24,11 @@ var websocket, doc, watcher, oldHtml;
 var setup = function() {
 	oldHtml = "";
 	console.log("Connecting...");
-	var websocket = new W3WebSocket("ws://localhost:7007/ws/");
+	var websocket = new W3WebSocket("ws://hikaru.cs.au.dk/ws/",
+		// 4 times "undefined" is the perfect amount.
+		undefined, undefined, undefined, undefined, {
+			maxReceivedFrameSize: 1024 * 1024 * 20 // 20 MB
+		});
 
 	var conn = new sharedb.Connection(websocket);
 
@@ -46,7 +50,8 @@ var setup = function() {
 
 	var sdbCloseHandler = websocket.onclose;
 	websocket.onclose = function(event) {
-		console.log("Connection closed, attempting to reconnect.");
+		console.log("Connection closed:", event.reason);
+		console.log("Attempting to reconnect.");
 		setTimeout(function() {
 			setup();
 		}, 1000);
@@ -127,7 +132,7 @@ function normalize(json) {
 function jsonToHtml(json) {
 	try {
 		return jsonml.toXML(json, ["area", "base", "br", "col", "embed", "hr", "img", "input",
-			"keygen", "link", "menuitem", "meta", "param", "source", "track", "wbr"]);		
+			"keygen", "link", "menuitem", "meta", "param", "source", "track", "wbr"]);
 	} catch (e) {
 		console.log("Unable to parse JsonML.");
 	}

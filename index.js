@@ -13,6 +13,18 @@ var webstrateId = argv.id || "contenteditable";
 var MOUNT_PATH = "./documents/";
 var MOUNT_POINT = MOUNT_PATH + webstrateId;
 
+var cleanUpAndTerminate = function() {
+	try {
+	fs.unlinkSync(MOUNT_POINT);
+	} catch (e) {
+		// If it fails, it probably just doesn't exist.
+	}
+	doc.destroy();
+	process.exit();
+};
+
+process.on('SIGINT', cleanUpAndTerminate);
+
 try {
 	fs.accessSync(MOUNT_PATH, fs.F_OK);
 } catch (e) {
@@ -38,11 +50,15 @@ var setup = function() {
 		sdbOpenHandler(event);
 	};
 
-	// We're sending our own events over the websocket connection that we don't want messing with ShareDB, so we filter
-	// them out.
+	// We're sending our own events over the websocket connection that we don't want messing with
+	// ShareDB, so we filter them out.
 	var sdbMessageHandler = websocket.onmessage;
 	websocket.onmessage = function(event) {
 		var data = JSON.parse(event.data);
+		if (data.error) {
+			console.error("Error:", data.error.message);
+			cleanUpAndTerminate();
+		}
 		if (!data.wa) {
 			sdbMessageHandler(event);
 		}
@@ -93,12 +109,6 @@ var setup = function() {
 };
 
 setup();
-
-process.on('SIGINT', function() {
-	fs.unlinkSync(MOUNT_POINT);
-	doc.destroy();
-	process.exit();
-});
 
 // All elements must have an attribute list, unless the element is a string
 function normalize(json) {

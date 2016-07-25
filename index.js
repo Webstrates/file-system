@@ -13,6 +13,8 @@ var webstrateId = argv.id || "contenteditable";
 var MOUNT_PATH = "./documents/";
 var MOUNT_POINT = MOUNT_PATH + webstrateId;
 
+var host = argv.host || argv.h || "localhost:7007";
+
 var cleanUpAndTerminate = function() {
 	try {
 	fs.unlinkSync(MOUNT_POINT);
@@ -35,8 +37,8 @@ var websocket, doc, watcher, oldHtml;
 
 var setup = function() {
 	oldHtml = "";
-	console.log("Connecting...");
-	var websocket = new W3WebSocket("ws://hikaru.cs.au.dk/ws/",
+	console.log("Connecting to " + host + "...");
+	var websocket = new W3WebSocket("ws://" + host + "/ws/",
 		// 4 times "undefined" is the perfect amount.
 		undefined, undefined, undefined, undefined, {
 			maxReceivedFrameSize: 1024 * 1024 * 20 // 20 MB

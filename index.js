@@ -154,7 +154,7 @@ function htmlToJson(html, callback) {
 	jsonmlParse(html.trim(), function(err, jsonml) {
 		if (err) throw err;
 		callback(jsonml);
-	});
+	}, { preserveEntities: true });
 }
 
 function fileChangeListener(path, stats) {

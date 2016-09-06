@@ -8,8 +8,6 @@ var sharedb = require("sharedb/lib/client");
 var jsonmlParse = require("jsonml-parse");
 var jsondiff = require("json0-ot-diff");
 var jsonml = require('jsonml-tools');
-var Entities = require('html-entities').XmlEntities;
-var entities = new Entities();
 
 var webstrateId = argv.id || "contenteditable";
 var MOUNT_PATH = "./documents/";
@@ -152,7 +150,9 @@ function recurse(xs, callback) {
 }
 
 function jsonToHtml(json) {
-	json = recurse(json, entities.encode);
+	json = recurse(json, function(str) {
+		return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+	});
 	try {
 		return jsonml.toXML(json, ["area", "base", "br", "col", "embed", "hr", "img", "input",
 			"keygen", "link", "menuitem", "meta", "param", "source", "track", "wbr"]);
@@ -164,7 +164,9 @@ function jsonToHtml(json) {
 function htmlToJson(html, callback) {
 	jsonmlParse(html.trim(), function(err, jsonml) {
 		if (err) throw err;
-		jsonml = recurse(jsonml, entities.decode);
+		jsonml = recurse(jsonml, function(str) {
+			return str.replace(/&gt;/g, ">").replace(/&lt;/g, "<").replace(/&amp;/g, "&");
+		});
 		callback(jsonml);
 	}, { preserveEntities: true });
 }

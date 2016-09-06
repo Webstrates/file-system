@@ -143,14 +143,15 @@ function normalize(json) {
 
 function recurse(xs, callback) {
 	return xs.map(function(x) {
-			if (typeof x === "string") return callback(x);
+			if (typeof x === "string") return callback(x, xs);
 			if (Array.isArray(x)) return recurse(x, callback);
 			return x;
 	});
 }
 
 function jsonToHtml(json) {
-	json = recurse(json, function(str) {
+	json = recurse(json, function(str, parent) {
+		if (["script", "style"].includes(parent[0])) { return str; }
 		return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 	});
 	try {
@@ -164,7 +165,8 @@ function jsonToHtml(json) {
 function htmlToJson(html, callback) {
 	jsonmlParse(html.trim(), function(err, jsonml) {
 		if (err) throw err;
-		jsonml = recurse(jsonml, function(str) {
+		jsonml = recurse(jsonml, function(str, parent) {
+			if (["script", "style"].includes(parent[0])) { return str; }
 			return str.replace(/&gt;/g, ">").replace(/&lt;/g, "<").replace(/&amp;/g, "&");
 		});
 		callback(jsonml);

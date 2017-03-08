@@ -15,13 +15,13 @@ var MOUNT_POINT = MOUNT_PATH + webstrateId;
 
 var host = argv.host || argv.h || "ws://localhost:7007";
 
-var normalizeHost = function(host){
-  const pattern = /^wss?:\/\//;
-  if(pattern.test(host)){
-    return host;
-  }
-  return "wss://" + host;
-}
+var normalizeHost = function(host) {
+	const pattern = /^wss?:\/\//;
+	if (pattern.test(host)) {
+		return host;
+	}
+	return "wss://" + host;
+	}
 
 var cleanUpAndTerminate = function() {
 	try {

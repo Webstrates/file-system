@@ -13,7 +13,15 @@ var webstrateId = argv.id || "contenteditable";
 var MOUNT_PATH = "./documents/";
 var MOUNT_POINT = MOUNT_PATH + webstrateId;
 
-var host = argv.host || argv.h || "localhost:7007";
+var host = argv.host || argv.h || "ws://localhost:7007";
+
+var normalizeHost = function(host){
+  const pattern = /^wss?:\/\//;
+  if(pattern.test(host)){
+    return host;
+  }
+  return "wss://" + host;
+}
 
 var cleanUpAndTerminate = function() {
 	try {
@@ -37,8 +45,8 @@ var websocket, doc, watcher, oldHtml;
 
 var setup = function() {
 	oldHtml = "";
-	console.log("Connecting to " + host + "...");
-	var websocket = new W3WebSocket("ws://" + host + "/ws/",
+	console.log("Connecting to " + normalizeHost(host) + "...");
+	var websocket = new W3WebSocket(normalizeHost(host) + "/ws/",
 		// 4 times "undefined" is the perfect amount.
 		undefined, undefined, undefined, undefined, {
 			maxReceivedFrameSize: 1024 * 1024 * 20 // 20 MB

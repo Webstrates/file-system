@@ -11,7 +11,7 @@ var jsonml = require('jsonml-tools');
 
 var webstrateId = argv.id || "contenteditable";
 var MOUNT_PATH = "./documents/";
-var MOUNT_POINT = MOUNT_PATH + webstrateId;
+var MOUNT_POINT = MOUNT_PATH + webstrateId + ".html";
 
 var host = argv.host || argv.h || "ws://localhost:7007";
 

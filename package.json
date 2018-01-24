@@ -10,9 +10,9 @@
   "license": "Apache-2.0",
   "dependencies": {
     "chokidar": "^1.6.0",
+    "html-to-jsonml": "0.0.2",
     "json0-ot-diff": "^1.0.1",
-    "jsonml-parse": "git+https://github.com/kbadk/jsonml-parse#master",
-    "jsonml-tools": "git+http://github.com/cklokmose/jsonml-tools.git#master",
+    "jsonml-tools": "git+http://github.com/Webstrates/jsonml-tools.git#master",
     "optimist": "^0.6.1",
     "sharedb": "^0.11.37",
     "websocket": "^1.0.23"

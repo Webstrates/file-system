@@ -5,9 +5,9 @@ var argv = require("optimist").argv;
 var fs = require("fs");
 var chokidar = require("chokidar");
 var sharedb = require("sharedb/lib/client");
-var jsonmlParse = require("jsonml-parse");
+var htmlToJsonML = require("html-to-jsonml");
 var jsondiff = require("json0-ot-diff");
-var jsonml = require('jsonml-tools');
+var jsonmlTools = require('jsonml-tools');
 
 var webstrateId = argv.id || "contenteditable";
 var MOUNT_PATH = "./documents/";
@@ -93,11 +93,11 @@ var setup = function() {
 	doc = conn.get("webstrates", webstrateId);
 
 	doc.on('op', function onOp(ops, source) {
-		var newHtml = jsonToHtml(doc.data)
+		var newHtml = jsonMLtoHtml(doc.data)
 		if (newHtml === oldHtml) {
 			return;
 		}
-		writeDocument(jsonToHtml(doc.data));
+		writeDocument(jsonMLtoHtml(doc.data));
 	});
 
 	doc.subscribe(function(err) {
@@ -112,7 +112,7 @@ var setup = function() {
 			doc.submitOp(op);
 		}
 
-		writeDocument(jsonToHtml(doc.data));
+		writeDocument(jsonMLtoHtml(doc.data));
 		watcher = chokidar.watch(MOUNT_POINT);
 		watcher.on('change', fileChangeListener);
 	});
@@ -149,37 +149,38 @@ function normalize(json) {
 	return [tagName.toLowerCase(), attributes, ...elementList];
 }
 
-function recurse(xs, callback) {
-	return xs.map(function(x) {
-			if (typeof x === "string") return callback(x, xs);
-			if (Array.isArray(x)) return recurse(x, callback);
-			return x;
-	});
-}
+/**
+ * Replaces a string with another string in the attribute names of a JsonML structure.
+ * Webstrate code usually handles this.
+ * @param  {JsonML} snapshot    JsonML structure.
+ * @param  {string} search      String to search for. Regex also works.
+ * @param  {string} replacement String to replace search with.
+ * @return {JsonML}             JsonML with replacements.
+ * @private
+ */
 
-function jsonToHtml(json) {
-	json = recurse(json, function(str, parent) {
-		if (["script", "style"].includes(parent[0])) { return str; }
-		return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-	});
-	try {
-		return jsonml.toXML(json, ["area", "base", "br", "col", "embed", "hr", "img", "input",
-			"keygen", "link", "menuitem", "meta", "param", "source", "track", "wbr"]);
-	} catch (e) {
-		console.log("Unable to parse JsonML.");
+function replaceInKeys(jsonml, search, replacement) {
+	if (Array.isArray(jsonml)) {
+		return jsonml.map(e => replaceInKeys(e, search, replacement));
 	}
+	if (typeof jsonml === 'object') {
+		for (const key in jsonml) {
+			const cleanKey = key.replace(search, replacement);
+			jsonml[cleanKey] = replaceInKeys(jsonml[key], search, replacement);
+			if (cleanKey !== key) {
+				delete jsonml[key];
+			}
+		}
+	}
+	return jsonml;
 }
 
-function htmlToJson(html, callback) {
-	jsonmlParse(html.trim(), function(err, jsonml) {
-		if (err) throw err;
-		jsonml = recurse(jsonml, function(str, parent) {
-			if (["script", "style"].includes(parent[0])) { return str; }
-			return str.replace(/&gt;/g, ">").replace(/&lt;/g, "<").replace(/&amp;/g, "&");
-		});
-		callback(jsonml);
-	}, { preserveEntities: true });
+function jsonMLtoHtml(json) {
+		return jsonmlTools.toXML(replaceInKeys(json, '&dot;', '.'),
+			["area", "base", "br", "col", "embed", "hr", "img", "input", "keygen", "link", "menuitem",
+			"meta", "param", "source", "track", "wbr"]);
 }
+
 
 function fileChangeListener(path, stats) {
 	var newHtml = fs.readFileSync(MOUNT_POINT, "utf8");
@@ -188,18 +189,17 @@ function fileChangeListener(path, stats) {
 	}
 
 	oldHtml = newHtml;
-	htmlToJson(newHtml, function(newJson) {
-		var normalizedOldJson = normalize(doc.data);
-		var normalizedNewJson = normalize(newJson);
-		var ops = jsondiff(doc.data, normalizedNewJson);
-		try {
-			doc.submitOp(ops);
-		} catch (e) {
-			console.log("Invalid document, rebuilding.");
-			var op = [{ "p": [], "oi": [ "html", {}, [ "body", {} ]]}];
-			doc.submitOp(op);
-		}
-	});
+	const newJson = htmlToJsonML(newHtml);
+	var normalizedOldJson = normalize(doc.data);
+	var normalizedNewJson = normalize(newJson);
+	var ops = jsondiff(doc.data, normalizedNewJson);
+	try {
+		doc.submitOp(ops);
+	} catch (e) {
+		console.log("Invalid document, rebuilding.");
+		var op = [{ "p": [], "oi": [ "html", {}, [ "body", {} ]]}];
+		doc.submitOp(op);
+	}
 }
 
 function doWhilePaused(callback) {

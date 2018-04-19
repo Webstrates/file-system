@@ -45,7 +45,7 @@ var websocket, doc, watcher, oldHtml;
 
 var setup = function() {
 	oldHtml = "";
-	console.log("Connecting to " + normalizeHost(host) + "...");
+	console.log(timestamp(), "Connecting to " + normalizeHost(host) + "...");
 	var websocket = new W3WebSocket(normalizeHost(host) + "/ws/",
 		// 4 times "undefined" is the perfect amount.
 		undefined, undefined, undefined, undefined, {
@@ -53,11 +53,15 @@ var setup = function() {
 		});
 
 	var conn = new sharedb.Connection(websocket);
+	let interval;
 
 	var sdbOpenHandler = websocket.onopen;
 	websocket.onopen = function(event) {
-		console.log("Connected.");
+		console.log(timestamp(), "Connected.");
 		sdbOpenHandler(event);
+		interval = setInterval(() => {
+			websocket.send(JSON.stringify({ type: 'alive' }));
+		}, 25 * 1000);
 	};
 
 	// We're sending our own events over the websocket connection that we don't want messing with
@@ -76,8 +80,9 @@ var setup = function() {
 
 	var sdbCloseHandler = websocket.onclose;
 	websocket.onclose = function(event) {
-		console.log("Connection closed:", event.reason);
-		console.log("Attempting to reconnect.");
+		clearInterval(interval);
+		console.log(timestamp(), "Connection closed:", event.reason);
+		console.log(timestamp(), "Attempting to reconnect.");
 		setTimeout(function() {
 			setup();
 		}, 1000);
@@ -86,7 +91,7 @@ var setup = function() {
 
 	var sdbErrorHandler = websocket.onerror;
 	websocket.onerror = function(event) {
-		console.log("Connection error.");
+		console.log(timestamp(), "Connection error.");
 		sdbErrorHandler(event);
 	};
 
@@ -106,7 +111,7 @@ var setup = function() {
 		}
 
 		if (!doc.type) {
-			console.log("Document doesn't exist on server, creating it.");
+			console.log(timestamp(), "Document doesn't exist on server, creating it.");
 			doc.create('json0');
 			var op = [{ "p": [], "oi": [ "html", {}, [ "body", {} ]]}];
 			doc.submitOp(op);
@@ -196,7 +201,7 @@ function fileChangeListener(path, stats) {
 	try {
 		doc.submitOp(ops);
 	} catch (e) {
-		console.log("Invalid document, rebuilding.");
+		console.log(timestamp(), "Invalid document, rebuilding.");
 		var op = [{ "p": [], "oi": [ "html", {}, [ "body", {} ]]}];
 		doc.submitOp(op);
 	}
@@ -214,4 +219,8 @@ function writeDocument(html) {
 		oldHtml = html;
 		fs.writeFileSync(MOUNT_POINT, html);
 	});
+}
+
+function timestamp() {
+	return (new Date).toTimeString().substring(0, 8)
 }

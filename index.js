@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 "use strict";
 
 const path = require('path');
@@ -11,13 +12,13 @@ const normalizeJson = require('./libs/normalize-json');
 const resourceManager = require('./libs/resource-manager');
 
 const webstrateId = argv.id || "contenteditable";
-const MOUNT_PATH = path.resolve('./documents/', webstrateId);
 
 const host = argv.host || argv.h || "localhost:7007";
 const insecure = argv.insecure || argv.i;
 const webHost = (insecure ? 'http://' : 'https://') + host + '/' + webstrateId + '/';
 const socketHost = (insecure ? 'ws://' : 'wss://') + host + '/ws/';
 
+const MOUNT_PATH = path.resolve(webstrateId);
 const fileManager = FileManager(MOUNT_PATH);
 
 // Holds current state of document.

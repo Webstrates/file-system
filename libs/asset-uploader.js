@@ -1,0 +1,55 @@
+const path = require('path');
+const fs = require('fs');
+const request = require('request');
+const webstrates = require('./webstrates-server');
+const chalk = require('chalk');
+const md5File = require('md5-file/promise');
+
+const upload = async (host, filePath, attempts = 0) => {
+	const assets = webstrates.getAssets();
+	if (!assets) {
+		if (attempts > 100) {
+			console.log(chalk.red('!'), 'Error: Never received assets from server.');
+		} else {
+			setTimeout(() => {
+				upload(host, filePath, attempts + 1);
+			}, 100);
+		}
+		return;
+	}
+
+	const fileName = path.basename(filePath);
+	const fileHash = await md5File(filePath);
+	const lastAsset = assets.reduce((lastAsset, currentAsset) =>
+		(currentAsset.fileName === fileName && currentAsset.v > lastAsset.v)
+		? currentAsset
+		: lastAsset,
+	{ v: 0 });
+
+	// We only continue if the last asset uploaded using the same name is the same as the one we're
+	// uploading now. Imagine uploading v1 of an asset, then v2, and then trying to upload v2 again.
+	// There's no reason to do this, since v2 is already accessible as just
+	// /<webstrateId>/<assetName>. However, if we upload v1, then v2, and then v1 again, we should
+	// re-upload v1, so it'll take over v2's place and gain the path /<webstrateId>/<assetName>.
+	const shouldUpload = !lastAsset || (lastAsset && lastAsset.fileHash !== fileHash);
+
+	if (!shouldUpload) {
+		console.log(chalk.cyan('◈'), 'Skipping asset', fileName,
+			'-- already available on the server.', chalk.gray('(' + fileHash + ')'));
+		return;
+	}
+
+	const req = request.post(host, (error, resp, body) => {
+		if (error) return console.log(chalk.red('!'), 'Error:', error);
+		const asset = JSON.parse(body);
+		console.log(chalk.cyan('◈'), 'Uploaded asset', asset.fileName, 'v=' + asset.v,
+			chalk.gray('(' + asset.fileHash + ')'));
+	});
+
+	const form = req.form();
+	form.append('file', fs.createReadStream(filePath));
+}
+
+module.exports = {
+	upload
+};

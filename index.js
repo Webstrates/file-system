@@ -1,217 +1,83 @@
 "use strict";
 
-var W3WebSocket = require('websocket').w3cwebsocket;
-var argv = require("optimist").argv;
-var fs = require("fs");
-var chokidar = require("chokidar");
-var sharedb = require("sharedb/lib/client");
-var htmlToJsonML = require("html-to-jsonml");
-var jsondiff = require("json0-ot-diff");
-var jsonmlTools = require('jsonml-tools');
+const path = require('path');
+const argv = require("optimist").argv;
+const htmlToJsonMl = require("html-to-jsonml");
+const jsonMlToHtml = require('./libs/jsonml-to-html');
+const webstrates = require('./libs/webstrates-server');
+const FileManager = require('./libs/file-manager');
+const assetUploader = require('./libs/asset-uploader');
+const normalizeJson = require('./libs/normalize-json');
+const resourceManager = require('./libs/resource-manager');
 
-var webstrateId = argv.id || "contenteditable";
-var MOUNT_PATH = "./documents/";
-var MOUNT_POINT = MOUNT_PATH + webstrateId + ".html";
+const webstrateId = argv.id || "contenteditable";
+const MOUNT_PATH = path.resolve('./documents/', webstrateId);
 
-var host = argv.host || argv.h || "ws://localhost:7007";
+const host = argv.host || argv.h || "localhost:7007";
+const insecure = argv.insecure || argv.i;
+const webHost = (insecure ? 'http://' : 'https://') + host + '/' + webstrateId + '/';
+const socketHost = (insecure ? 'ws://' : 'wss://') + host + '/ws/';
 
-var normalizeHost = function(host) {
-	const pattern = /^wss?:\/\//;
-	if (pattern.test(host)) {
-		return host;
-	}
-	return "wss://" + host;
-	}
+const fileManager = FileManager(MOUNT_PATH);
 
-var cleanUpAndTerminate = function() {
-	try {
-	fs.unlinkSync(MOUNT_POINT);
-	} catch (e) {
-		// If it fails, it probably just doesn't exist.
-	}
-	doc.destroy();
-	process.exit();
-};
+// Holds current state of document.
+let jsonml;
+// Holds all resources (script and style tags) that have been extracted into separate files.
+let resources = new Map();
 
-process.on('SIGINT', cleanUpAndTerminate);
+webstrates.onChange((jsonml) => {
+	jsonml = normalizeJson(jsonml);
+	let extractedResources = [];
+	// Extract resources by side effects.
+	jsonml = resourceManager.extract(jsonml, extractedResources);
+	extractedResources.forEach(([fileName, resource]) => {
+		fileManager.writeFile('resources/' + fileName, resource);
+		resources.set(fileName, resource);
+	});
 
-try {
-	fs.accessSync(MOUNT_PATH, fs.F_OK);
-} catch (e) {
-	fs.mkdirSync(MOUNT_PATH);
-}
+	const html = jsonMlToHtml(jsonml);
+	fileManager.writeFile('index.html', html);
+});
 
-var websocket, doc, watcher, oldHtml;
+webstrates.onClose((event) => {
+	console.log('Reconnecting');
+	webstrates.connect(socketHost, webstrateId);
+});
 
-var setup = function() {
-	oldHtml = "";
-	console.log("Connecting to " + normalizeHost(host) + "...");
-	var websocket = new W3WebSocket(normalizeHost(host) + "/ws/",
-		// 4 times "undefined" is the perfect amount.
-		undefined, undefined, undefined, undefined, {
-			maxReceivedFrameSize: 1024 * 1024 * 20 // 20 MB
+// Listen for changes to the file system. fileName is the file name, hash is an md5 hash of the file
+// if the file is an asset. readFile is a function that returns the contents of the file.
+fileManager.onChange((type, activePath, readFile) => {
+	const fileName = path.basename(activePath);
+	if (type === 'primary' && fileName === 'index.html') {
+		let html = readFile();
+		jsonml = normalizeJson(htmlToJsonMl(html));
+
+		// We extract any resources by (side effect) that might have been added manually to index.html.
+		let extractedResources = [];
+		jsonml = resourceManager.extract(jsonml, extractedResources);
+		extractedResources.forEach(([fileName, resource]) => {
+			fileManager.writeFile('resources/' + fileName, resource);
+			resources.set(fileName, resource);
 		});
 
-	var conn = new sharedb.Connection(websocket);
-
-	var sdbOpenHandler = websocket.onopen;
-	websocket.onopen = function(event) {
-		console.log("Connected.");
-		sdbOpenHandler(event);
-	};
-
-	// We're sending our own events over the websocket connection that we don't want messing with
-	// ShareDB, so we filter them out.
-	var sdbMessageHandler = websocket.onmessage;
-	websocket.onmessage = function(event) {
-		var data = JSON.parse(event.data);
-		if (data.error) {
-			console.error("Error:", data.error.message);
-			cleanUpAndTerminate();
-		}
-		if (!data.wa) {
-			sdbMessageHandler(event);
-		}
-	};
-
-	var sdbCloseHandler = websocket.onclose;
-	websocket.onclose = function(event) {
-		console.log("Connection closed:", event.reason);
-		console.log("Attempting to reconnect.");
-		setTimeout(function() {
-			setup();
-		}, 1000);
-		sdbCloseHandler(event);
-	};
-
-	var sdbErrorHandler = websocket.onerror;
-	websocket.onerror = function(event) {
-		console.log("Connection error.");
-		sdbErrorHandler(event);
-	};
-
-	doc = conn.get("webstrates", webstrateId);
-
-	doc.on('op', function onOp(ops, source) {
-		var newHtml = jsonMLtoHtml(doc.data)
-		if (newHtml === oldHtml) {
-			return;
-		}
-		writeDocument(jsonMLtoHtml(doc.data));
-	});
-
-	doc.subscribe(function(err) {
-		if (err) {
-			throw err;
+		// If we have extracted something, we need to update index.html.
+		if (extractedResources.length > 0) {
+			html = jsonMlToHtml(jsonml);
+			fileManager.writeFile('index.html', html);
 		}
 
-		if (!doc.type) {
-			console.log("Document doesn't exist on server, creating it.");
-			doc.create('json0');
-			var op = [{ "p": [], "oi": [ "html", {}, [ "body", {} ]]}];
-			doc.submitOp(op);
-		}
-
-		writeDocument(jsonMLtoHtml(doc.data));
-		watcher = chokidar.watch(MOUNT_POINT);
-		watcher.on('change', fileChangeListener);
-	});
-};
-
-setup();
-
-// All elements must have an attribute list, unless the element is a string
-function normalize(json) {
-	if (typeof json === "undefined" || json.length === 0) {
-		return [];
+		jsonml = resourceManager.insert(jsonml, resources);
+		webstrates.save(jsonml);
 	}
-
-	if (typeof json === "string") {
-		return json;
+	else if (type === 'asset') {
+		assetUploader.upload(webHost, activePath);
+	} else if (type === 'resource') {
+		// If the change happened to a file that's a resource (by method of exclusion).
+		resources.set(fileName, readFile());
+		jsonml = resourceManager.insert(jsonml, resources);
+		webstrates.save(jsonml);
 	}
+});
 
-	var [tagName, attributes, ...elementList] = json;
-
-	// Second element should always be an attributes object.
-	if (Array.isArray(attributes) || typeof attributes === "string") {
-		elementList.unshift(attributes);
-		attributes = {};
-	}
-
-	if (!attributes) {
-		attributes = {};
-	}
-
-	elementList = elementList.map(function(element) {
-		return normalize(element);
-	});
-
-	return [tagName.toLowerCase(), attributes, ...elementList];
-}
-
-/**
- * Replaces a string with another string in the attribute names of a JsonML structure.
- * Webstrate code usually handles this.
- * @param  {JsonML} snapshot    JsonML structure.
- * @param  {string} search      String to search for. Regex also works.
- * @param  {string} replacement String to replace search with.
- * @return {JsonML}             JsonML with replacements.
- * @private
- */
-
-function replaceInKeys(jsonml, search, replacement) {
-	if (Array.isArray(jsonml)) {
-		return jsonml.map(e => replaceInKeys(e, search, replacement));
-	}
-	if (typeof jsonml === 'object') {
-		for (const key in jsonml) {
-			const cleanKey = key.replace(search, replacement);
-			jsonml[cleanKey] = replaceInKeys(jsonml[key], search, replacement);
-			if (cleanKey !== key) {
-				delete jsonml[key];
-			}
-		}
-	}
-	return jsonml;
-}
-
-function jsonMLtoHtml(json) {
-		return jsonmlTools.toXML(replaceInKeys(json, '&dot;', '.'),
-			["area", "base", "br", "col", "embed", "hr", "img", "input", "keygen", "link", "menuitem",
-			"meta", "param", "source", "track", "wbr"]);
-}
-
-
-function fileChangeListener(path, stats) {
-	var newHtml = fs.readFileSync(MOUNT_POINT, "utf8");
-	if (newHtml === oldHtml) {
-		return;
-	}
-
-	oldHtml = newHtml;
-	const newJson = htmlToJsonML(newHtml);
-	var normalizedOldJson = normalize(doc.data);
-	var normalizedNewJson = normalize(newJson);
-	var ops = jsondiff(doc.data, normalizedNewJson);
-	try {
-		doc.submitOp(ops);
-	} catch (e) {
-		console.log("Invalid document, rebuilding.");
-		var op = [{ "p": [], "oi": [ "html", {}, [ "body", {} ]]}];
-		doc.submitOp(op);
-	}
-}
-
-function doWhilePaused(callback) {
-	//if (watcher) watcher.close();
-	callback();
-	//watcher = chokidar.watch(MOUNT_POINT);
-	//watcher.on('change', fileChangeListener);
-}
-
-function writeDocument(html) {
-	doWhilePaused(function() {
-		oldHtml = html;
-		fs.writeFileSync(MOUNT_POINT, html);
-	});
-}
+webstrates.connect(socketHost, webstrateId);
+fileManager.watch();

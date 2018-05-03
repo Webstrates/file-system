@@ -1,17 +1,17 @@
 // All elements must have an attribute list, unless the element is a string
 function normalize(json) {
-	if (typeof json === "undefined" || json.length === 0) {
+	if (typeof json === 'undefined' || json.length === 0) {
 		return [];
 	}
 
-	if (typeof json === "string") {
+	if (typeof json === 'string') {
 		return json;
 	}
 
 	var [tagName, attributes, ...elementList] = json;
 
 	// Second element should always be an attributes object.
-	if (Array.isArray(attributes) || typeof attributes === "string") {
+	if (Array.isArray(attributes) || typeof attributes === 'string') {
 		elementList.unshift(attributes);
 		attributes = {};
 	}

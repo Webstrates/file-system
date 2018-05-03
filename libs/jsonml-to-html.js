@@ -27,8 +27,8 @@ function replaceInKeys(jsonml, search, replacement) {
 
 function jsonMlToHtml(json) {
 	return jsonmlTools.toXML(replaceInKeys(json, '&dot;', '.'),
-		["area", "base", "br", "col", "embed", "hr", "img", "input", "keygen", "link", "menuitem",
-		"meta", "param", "source", "track", "wbr"]);
+		['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem',
+			'meta', 'param', 'source', 'track', 'wbr']);
 }
 
 module.exports = jsonMlToHtml;

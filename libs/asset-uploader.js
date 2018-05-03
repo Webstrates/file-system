@@ -5,25 +5,36 @@ const webstrates = require('./webstrates-server');
 const chalk = require('chalk');
 const md5File = require('md5-file/promise');
 
+/**
+ * Upload asset to the server, assuming it isn't already there and accessible at the "head".
+ * @param  {string}  host      URL of server.
+ * @param  {string}  filePath  Path to file to be uplaoded.
+ * @param  {Number}  attempts  Used internally to detmine retries. Should not be provided by the
+ *                             caller.
+ * @public
+ */
 const upload = async (host, filePath, attempts = 0) => {
-	const assets = webstrates.getAssets();
-	if (!assets) {
+	// We're waiting for the assets object to appear, i.e. for us to be connected to the server.
+	if (!webstrates.assets) {
 		if (attempts > 100) {
-			console.log(chalk.red('!'), 'Error: Never received assets from server.');
+			console.error(chalk.red(chalk.bold('!')), 'Error: Never received assets from server.');
 		} else {
 			setTimeout(() => {
 				upload(host, filePath, attempts + 1);
-			}, 100);
+			}, 50);
 		}
 		return;
 	}
 
+	// If we don't have access to upload assets, we stop.
+	if (!webstrates.httpAccess) return;
+
 	const fileName = path.basename(filePath);
 	const fileHash = await md5File(filePath);
-	const lastAsset = assets.reduce((lastAsset, currentAsset) =>
+	const lastAsset = webstrates.assets.reduce((lastAsset, currentAsset) =>
 		(currentAsset.fileName === fileName && currentAsset.v > lastAsset.v)
-		? currentAsset
-		: lastAsset,
+			? currentAsset
+			: lastAsset,
 	{ v: 0 });
 
 	// We only continue if the last asset uploaded using the same name is the same as the one we're
@@ -39,8 +50,8 @@ const upload = async (host, filePath, attempts = 0) => {
 		return;
 	}
 
-	const req = request.post(host, (error, resp, body) => {
-		if (error) return console.log(chalk.red('!'), 'Error:', error);
+	const req = request.post(host, (error, response, body) => {
+		if (error) return console.log(chalk.red(chalk.bold('!')), 'Error:', error);
 		const asset = JSON.parse(body);
 		console.log(chalk.cyan('◈'), 'Uploaded asset', asset.fileName, 'v=' + asset.v,
 			chalk.gray('(' + asset.fileHash + ')'));
@@ -48,7 +59,7 @@ const upload = async (host, filePath, attempts = 0) => {
 
 	const form = req.form();
 	form.append('file', fs.createReadStream(filePath));
-}
+};
 
 module.exports = {
 	upload

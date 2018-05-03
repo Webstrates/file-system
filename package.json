@@ -1,6 +1,6 @@
 {
   "name": "webstrates-file-system",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Mounts a Webstrate document as a file on disk, propagating changes between the file and document.",
   "main": "index.js",
   "scripts": {
@@ -17,7 +17,7 @@
     "json0-ot-diff": "^1.0.3",
     "jsonml-tools": "git+http://github.com/Webstrates/jsonml-tools.git#master",
     "md5-file": "^4.0.0",
-    "optimist": "^0.6.1",
+    "minimist": "^1.2.0",
     "request": "^2.85.0",
     "sharedb": "^0.11.37",
     "websocket": "^1.0.23"
@@ -32,8 +32,8 @@
     "ot",
     "jsonml"
   ],
-   "bin": {
+  "bin": {
     "wfs": "./index.js"
-   },
-   "preferGlobal": true
+  },
+  "preferGlobal": true
 }

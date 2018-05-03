@@ -1,5 +1,5 @@
 const path = require('path');
-const fs = require('fs-extra')
+const fs = require('fs-extra');
 const chokidar = require('chokidar');
 
 let onChangeHandler;
@@ -12,12 +12,10 @@ const watchPath = (watchPath) => {
 	fs.ensureDirSync(assetPath);
 	fs.ensureDirSync(resourcePath);
 
-	chokidar.watch(watchPath, { ignored: /(^|[\/\\])\../}).on('all', async (event, activePath) => {
-		let hash = null;
-
-		const type = assetPath === path.dirname(activePath) ? 'asset' :
-			resourcePath === path.dirname(activePath) ? 'resource' :
-			'primary';
+	chokidar.watch(watchPath, { ignored: /(^|[/\\])\../}).on('all', async (event, activePath) => {
+		const type = assetPath === path.dirname(activePath) ? 'asset'
+			: resourcePath === path.dirname(activePath) ? 'resource'
+				: 'primary';
 
 		// If the file was deleted.
 		if (!fs.existsSync(activePath)) {
@@ -30,7 +28,7 @@ const watchPath = (watchPath) => {
 
 		onChangeHandler(type, activePath, () => fs.readFileSync(activePath, 'utf8'));
 	});
-}
+};
 
 const writeFile = async (path, data) => {
 	fs.ensureFileSync(path);

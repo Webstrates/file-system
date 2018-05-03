@@ -6,14 +6,14 @@ const extract = (jsonml, resources) => {
 		if (index === 0
 			// And the tag is a script and the element has an id that ends with .js
 			&& ((element.toLowerCase() === 'script' && jsonml[1].id && jsonml[1].id.endsWith('.js'))
-				// Or the tag is a style and the element has an id that ends with .css
+			// Or the tag is a style and the element has an id that ends with .css
 			|| (element.toLowerCase() === 'style' && jsonml[1].id && jsonml[1].id.endsWith('.css')))) {
-				// We remove the contents from the tag (i.e. removes the JS or CSS code).
-				const resource = jsonml.splice(2).join('\n');
-				// And save it as a resource instead
-				if (resource) {
-					resources.push([jsonml[1].id, resource]);
-				}
+			// We remove the contents from the tag (i.e. removes the JS or CSS code).
+			const resource = jsonml.splice(2).join('\n');
+			// And save it as a resource instead
+			if (resource) {
+				resources.push([jsonml[1].id, resource]);
+			}
 		}
 		return;
 	});
@@ -28,16 +28,16 @@ const insert = (jsonml, resources) => {
 		if (index === 0
 			// And the tag is a script and the element has an id that ends with .js
 			&& ((element.toLowerCase() === 'script' && jsonml[1].id && jsonml[1].id.endsWith('.js'))
-				// Or the tag is a style and the element has an id that ends with .css
+			// Or the tag is a style and the element has an id that ends with .css
 			|| (element.toLowerCase() === 'style' && jsonml[1].id && jsonml[1].id.endsWith('.css')))) {
-				// We remove the contents from the tag (the resoruce is already in there).
-				jsonml.splice(2);
-				// We find the resource in resources.
-				const resource = resources.get(jsonml[1].id);
-				// And insert it into the jsonml.
-				if (resource) {
-					jsonml.push(resource);
-				}
+			// We remove the contents from the tag (the resoruce is already in there).
+			jsonml.splice(2);
+			// We find the resource in resources.
+			const resource = resources.get(jsonml[1].id);
+			// And insert it into the jsonml.
+			if (resource) {
+				jsonml.push(resource);
+			}
 		}
 		return;
 	});

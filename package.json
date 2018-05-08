@@ -11,7 +11,7 @@
   "dependencies": {
     "chalk": "^2.4.1",
     "chokidar": "^1.7.0",
-    "diff-match-patch": "^1.0.0",
+    "diff-match-patch": "^1.0.1",
     "fs-extra": "^6.0.0",
     "html-to-jsonml": "0.0.2",
     "json0-ot-diff": "^1.0.3",
@@ -20,7 +20,7 @@
     "minimist": "^1.2.0",
     "request": "^2.85.0",
     "sharedb": "^0.11.37",
-    "websocket": "^1.0.23"
+    "websocket": "^1.0.26"
   },
   "devDependencies": {},
   "repository": {

@@ -158,10 +158,17 @@ module.exports.save = async (jsonml) => {
  */
 module.exports.checkAccess = (host) => {
 	request.get(host, (error, response, body) => {
+		if (error) {
+			let errorMessage = error.code;
+			if (error.code === 'EPROTO') errorMessage = 'Invalid protocol (try --insecure)';
+			else if (error.code === 'ENOTFOUND') errorMessage = 'Can\'t resolve host';
+			console.error(chalk.red(chalk.bold('!')), 'Error: ' + errorMessage);
+			process.exit(1);
+		}
 		if (response.statusCode === 401) {
 			console.warn(chalk.yellow('!'), 'Will not be able to upload assets, unauthorized.'),
 			console.warn('(Did you remember to specify HTTP basic credentials in the --host parameter?)');
-		} else if (response.statusCode === 2000) {
+		} else if (response.statusCode === 200) {
 			module.exports.httpAccess = true;
 		}
 	});

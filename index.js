@@ -81,10 +81,13 @@ fileManager.onChange(async (type, activePath, readFile) => {
 		assetUploader.upload(WEB_HOST, activePath);
 	}
 	else if (type === 'resource') {
-		// If the change happened to a file that's a resource (by method of exclusion).
 		resources.set(fileName, readFile());
-		jsonml = resourceManager.insert(jsonml, resources);
-		webstrates.save(jsonml);
+		// The HTML file might not have been read yet, in which case jsonml hasn't been defined. Because
+		// of this, we can't insert the the resource into it.
+		if (jsonml) {
+			jsonml = resourceManager.insert(jsonml, resources);
+			webstrates.save(jsonml);
+		}
 	}
 });
 

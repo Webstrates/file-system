@@ -81,7 +81,11 @@ fileManager.onChange(async (type, activePath, readFile) => {
 		assetUploader.upload(WEB_HOST, activePath);
 	}
 	else if (type === 'resource') {
-		resources.set(fileName, readFile());
+		const resource = readFile();
+		// Don't update jsonml if the file hasn't changed.
+		if (resources.get(fileName) === resource) return;
+
+		resources.set(fileName, resource);
 		// The HTML file might not have been read yet, in which case jsonml hasn't been defined. Because
 		// of this, we can't insert the the resource into it.
 		if (jsonml) {
@@ -106,6 +110,9 @@ webstrates.onChange((jsonml) => {
 	let extractedResources = [];
 	jsonml = resourceManager.extract(jsonml, extractedResources);
 	extractedResources.forEach(([fileName, resource]) => {
+		// Don't rewrite the file if it hasn't changed.
+		if (resources.get(fileName) === resource) return;
+
 		fileManager.writeFile('resources/' + fileName, resource);
 		resources.set(fileName, resource);
 	});

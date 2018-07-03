@@ -99,7 +99,7 @@ fileManager.watch();
 
 // Listen for changes on the Webstrates server.
 webstrates.onChange((jsonml) => {
-	// If we're prefering our version over the version on the server (theirs), we don't want to have
+	// If we're preferring our version over the version on the server (theirs), we don't want to have
 	// our local version overwritten whatever comes from the server, so we ignore all updates coming
 	// from the server, until we've submitted our own.
 	if (KEEP_OURS && !hasSubmittedOurs) return;

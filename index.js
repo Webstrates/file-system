@@ -78,7 +78,7 @@ fileManager.onChange(async (type, activePath, readFile) => {
 		hasSubmittedOurs = true;
 	}
 	else if (type === 'asset') {
-		assetUploader.upload(WEB_HOST, activePath);
+		await assetUploader.upload(WEB_HOST, activePath);
 	}
 	else if (type === 'resource') {
 		const resource = readFile();
@@ -90,7 +90,7 @@ fileManager.onChange(async (type, activePath, readFile) => {
 		// of this, we can't insert the the resource into it.
 		if (jsonml) {
 			jsonml = resourceManager.insert(jsonml, resources);
-			webstrates.save(jsonml);
+			await webstrates.save(jsonml);
 		}
 	}
 });

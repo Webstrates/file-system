@@ -45,8 +45,8 @@ const upload = async (host, filePath, attempts = 0) => {
 	const shouldUpload = !lastAsset || (lastAsset && lastAsset.fileHash !== fileHash);
 
 	if (!shouldUpload) {
-		console.log(chalk.cyan('◈'), 'Skipping asset', fileName,
-			'-- already available on the server.', chalk.gray('(' + fileHash + ')'));
+		console.log(chalk.cyan('◈'), 'Skipping asset', chalk.bold(fileName),
+			'- already available on the server.', chalk.gray('(' + fileHash + ')'));
 		return;
 	}
 

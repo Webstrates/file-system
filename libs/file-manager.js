@@ -12,6 +12,13 @@ const watchPath = (watchPath) => {
 	fs.ensureDirSync(assetPath);
 	fs.ensureDirSync(resourcePath);
 
+	// We start out by triggering all existing assets as changed.
+	fs.readdirSync(assetPath).forEach(file => {
+		const type = 'asset';
+		const activePath = path.resolve(assetPath, file)
+		onChangeHandler(type, activePath, () => fs.readFileSync(activePath, 'utf8'));
+	});
+
 	chokidar.watch(watchPath, { ignored: /(^|[/\\])\../}).on('all', async (event, activePath) => {
 		const type = assetPath === path.dirname(activePath) ? 'asset'
 			: resourcePath === path.dirname(activePath) ? 'resource'

@@ -1,6 +1,6 @@
 {
   "name": "webstrates-file-system",
-  "version": "2.0.9",
+  "version": "2.0.11",
   "description": "Mounts a Webstrate document as a file on disk, propagating changes between the file and document.",
   "main": "index.js",
   "scripts": {
@@ -33,7 +33,8 @@
     "jsonml"
   ],
   "bin": {
-    "wfs": "./index.js"
+    "wfs": "./index.js",
+    "webstratesfs": "./index.js"
   },
   "preferGlobal": true
 }

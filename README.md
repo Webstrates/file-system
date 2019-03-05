@@ -20,7 +20,8 @@ Webstrates File System allows you to mount a webstrate as a folder on the disk, 
 If installed using NPM, run from anywhere:
 
     wfs --id=<webstrateId> --host=<host> [<folder>]`
-    
+
+(On Windows, `wfs` will conflict with Windows Fax and Scan. Instead, use `webstratesfs`.)
 
 If installed using Git, navigate to the `Webstrates-file-system/` folder and run
 

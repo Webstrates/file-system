@@ -14,6 +14,13 @@ const md5File = require('md5-file/promise');
  * @public
  */
 const upload = async (host, filePath, attempts = 0) => {
+	const fileName = path.basename(filePath);
+
+	// Skipping files like .DS_Store.
+	if (fileName.startsWith('.')) {
+		return;
+	}
+
 	// We're waiting for the assets object to appear, i.e. for us to be connected to the server.
 	if (!webstrates.assets) {
 		if (attempts > 100) {
@@ -29,7 +36,6 @@ const upload = async (host, filePath, attempts = 0) => {
 	// If we don't have access to upload assets, we stop.
 	if (!webstrates.httpAccess) return;
 
-	const fileName = path.basename(filePath);
 	const fileHash = await md5File(filePath);
 	const lastAsset = webstrates.assets.reduce((lastAsset, currentAsset) =>
 		(currentAsset.fileName === fileName && currentAsset.v > lastAsset.v)

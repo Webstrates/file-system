@@ -7,9 +7,10 @@ const diffMatchPatch = require('diff-match-patch');
 const jsondiff = require('json0-ot-diff');
 const normalizeJson = require('./normalize-json');
 
-let changeHandler, closeHandler;
+let changeHandler, closeHandler, assetHandler;
 module.exports.onChange = (handler) => changeHandler = handler;
 module.exports.onClose = (handler) => closeHandler = handler;
+module.exports.onAsset = (handler) => assetHandler = handler;
 
 /** Print an object, but makes sure it's not too wide for the terminal.
  * @private
@@ -30,6 +31,10 @@ const createWebsocket = (host) => {
 		});
 };
 
+const timestamp = () => {
+	return (new Date).toTimeString().substring(0, 8)
+};
+
 let sharedbDoc, keepAliveInterval;
 
 /**
@@ -42,7 +47,7 @@ module.exports.connect = (host, webstrateId) => {
 
 	const sdbOpenHandler = websocket.onopen;
 	websocket.onopen = function(event) {
-		console.log(chalk.gray('◈'), 'Connected');
+		console.log(timestamp(), chalk.gray('◈'), 'Connected');
 		sdbOpenHandler(event);
 		keepAliveInterval = setInterval(() => {
 			websocket.send(JSON.stringify({ type: 'alive' }));
@@ -55,7 +60,7 @@ module.exports.connect = (host, webstrateId) => {
 	websocket.onmessage = (event) => {
 		const data = JSON.parse(event.data);
 		if (data.error) {
-			console.error(chalk.red(chalk.bold('!')), 'Error:', data.error.message);
+			console.error(timestamp(), chalk.red(chalk.bold('!')), 'Error:', data.error.message);
 		}
 
 		if (!data.wa) {
@@ -65,20 +70,22 @@ module.exports.connect = (host, webstrateId) => {
 		// Save initial assets.
 		if (data.wa === 'assets') {
 			module.exports.assets = data.assets;
+			assetHandler && assetHandler(data.assets);
 		}
 
 		// Update assets when a new asset is added.
 		if (data.wa === 'asset') {
 			const asset = data.asset;
-			console.log(chalk.cyan('◈'), 'New asset on the server', asset.fileName, 'v=' + asset.v,
+			console.log(timestamp(), chalk.cyan('◈'), 'New asset on the server', asset.fileName, 'v=' + asset.v,
 				chalk.gray('(' + asset.fileHash + ')'));
 			module.exports.assets.push(asset);
+			assetHandler && assetHandler([asset]);
 		}
 	};
 
 	const sdbCloseHandler = websocket.onclose;
 	websocket.onclose = (event) => {
-		console.log(chalk.red(chalk.bold('!')), 'Connected closed:', event.reason);
+		console.log(timestamp(), chalk.red(chalk.bold('!')), 'Connected closed:', event.reason);
 		closeHandler(event);
 		sdbCloseHandler(event);
 		clearInterval(keepAliveInterval);
@@ -97,7 +104,7 @@ module.exports.connect = (host, webstrateId) => {
 		// Ignore our own ops.
 		if (source) return;
 
-		console.log(chalk.keyword('orange')('⬇'), shorten(ops));
+		console.log(timestamp(), chalk.keyword('orange')('⬇'), shorten(ops));
 		changeHandler(sharedbDoc.data, ops);
 	});
 
@@ -105,7 +112,7 @@ module.exports.connect = (host, webstrateId) => {
 		if (error) return closeHandler(error);
 
 		if (!sharedbDoc.type) {
-			console.log('Document doesn\'t exist on server, creating it.');
+			console.log(timestamp(), 'Document doesn\'t exist on server, creating it.');
 			sharedbDoc.create('json0');
 			const op = [{ 'p': [], 'oi': [ 'html', {}, [ 'body', {} ]]}];
 			sharedbDoc.submitOp(op);
@@ -129,7 +136,7 @@ module.exports.save = async (jsonml) => {
 	const retries = 0;
 	while (!sharedbDoc.type) {
 		if (retries === 100) {
-			console.error(chalk.red(chalk.bold('!')), 'Error: Never established ShareDB connection.');
+			console.error(timestamp(), chalk.red(chalk.bold('!')), 'Error: Never established ShareDB connection.');
 			return;
 		}
 		await sleep(50);
@@ -144,11 +151,11 @@ module.exports.save = async (jsonml) => {
 	try {
 		await submitOp(ops);
 	} catch (e) {
-		console.warn('Invalid document, rebuilding.', e);
+		console.warn(timestamp(), 'Invalid document, rebuilding.', e);
 		ops = [{ 'p': [], 'oi': [ 'html', {}, [ 'body', {} ]]}];
 		await submitOp(ops);
 	}
-	console.log(chalk.green('⬆'), shorten(ops));
+	console.log(timestamp(), chalk.green('⬆'), shorten(ops));
 };
 
 /**
@@ -162,12 +169,12 @@ module.exports.checkAccess = (host) => {
 			let errorMessage = error.code;
 			if (error.code === 'EPROTO') errorMessage = 'Invalid protocol (try --insecure)';
 			else if (error.code === 'ENOTFOUND') errorMessage = 'Can\'t resolve host';
-			console.error(chalk.red(chalk.bold('!')), 'Error: ' + errorMessage);
+			console.error(timestamp(), chalk.red(chalk.bold('!')), 'Error: ' + errorMessage);
 			process.exit(1);
 		}
 		if (response.statusCode === 401) {
-			console.warn(chalk.yellow('!'), 'Will not be able to upload assets, unauthorized.'),
-			console.warn('(Did you remember to specify HTTP basic credentials in the --host parameter?)');
+			console.warn(timestamp(), chalk.yellow('!'), 'Will not be able to upload assets, unauthorized.'),
+			console.warn(timestamp(), '(Did you remember to specify HTTP basic credentials in the --host parameter?)');
 		} else if (response.statusCode === 200) {
 			module.exports.httpAccess = true;
 		}

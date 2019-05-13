@@ -19,7 +19,7 @@ Webstrates File System allows you to mount a webstrate as a folder on the disk, 
 
 If installed using NPM, run from anywhere:
 
-    wfs --id=<webstrateId> --host=<host> [<folder>]`
+    wfs --id=<webstrateId> --host=<host> [<folder>]
 
 (On Windows, `wfs` will conflict with Windows Fax and Scan. Instead, use `webstratesfs`.)
 
@@ -62,6 +62,10 @@ When connecting to a webstrate document using a folder already containing an `in
 To use WFS only as a deployment tool, the `--oneshot` parameter can be used. This composes the resources and the `index.html`, updates the document on the server and terminates.
 
 NB: Remember to set up your editor to auto-reload the file on changes.
+
+**Downloading assets**
+
+By default, files found in the `assets/` folder are uploaded, but existing assets from the server aren't downloaded. When using `--download-assets`, WFS will download (the newest version of) all assets on the server when connecting and continuously listen for new assets and download them as well to maintain a local copy.
 
 ## How?
 

@@ -10,6 +10,7 @@ const jsonMlToHtml = require('./libs/jsonml-to-html');
 const webstrates = require('./libs/webstrates-server');
 const FileManager = require('./libs/file-manager');
 const assetUploader = require('./libs/asset-uploader');
+const assetDownloader = require('./libs/asset-downloader');
 const normalizeJson = require('./libs/normalize-json');
 const resourceManager = require('./libs/resource-manager');
 
@@ -23,6 +24,7 @@ const WEB_HOST = (SECURE ? 'https://' : 'http://') + HOST + '/' + WEBSTRATE_ID +
 const SOCKET_HOST = (SECURE ? 'wss://' : 'ws://') + HOST + '/ws/';
 // Whether to terminate immediately after compiling and submitting the index.html.
 const ONE_SHOT = argv.oneshot || argv.n || false;
+global.DOWNLOAD_ASSETS = argv['download-assets'] || false;
 
 if (!WEBSTRATE_ID) {
 	console.error(chalk.red(chalk.bold('!')), 'Missing --webstrateId parameter.');
@@ -109,6 +111,7 @@ webstrates.onChange((jsonml) => {
 	// Extract resources by side effects.
 	let extractedResources = [];
 	jsonml = resourceManager.extract(jsonml, extractedResources);
+
 	extractedResources.forEach(([fileName, resource]) => {
 		// Don't rewrite the file if it hasn't changed.
 		if (resources.get(fileName) === resource) return;
@@ -125,5 +128,23 @@ webstrates.onClose((event) => {
 	console.log('Reconnecting');
 	webstrates.connect(SOCKET_HOST, WEBSTRATE_ID);
 });
+
+// Download assets to disk if --download-assets flag is set.
+if (global.DOWNLOAD_ASSETS) {
+	webstrates.onAsset(async (assets) => {
+		const assetNames = [...new Set(assets.map(asset =>
+			asset.fileName))];
+
+		for (let i=0; i < assetNames.length; i++) {
+			const assetName = assetNames[i];
+			// Add file to the fileManager's ignore list, so it doesn't trigger an upload.
+			fileManager.ignoreList.add(assetName);
+			await assetDownloader.download(WEB_HOST, WEBSTRATE_ID, assetName, fileManager.assetPath());
+			// Remove from the ignore list. We delay it, to ensure the fileManager has picked up on the write
+			// (and ignored it).
+			setTimeout(() => fileManager.ignoreList.delete(assetName), 5 * 1000);
+		}
+	});
+}
 
 webstrates.connect(SOCKET_HOST, WEBSTRATE_ID);

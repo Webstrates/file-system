@@ -33,9 +33,6 @@ const upload = async (host, filePath, attempts = 0) => {
 		return;
 	}
 
-	// If we don't have access to upload assets, we stop.
-	if (!webstrates.httpAccess) return;
-
 	const fileHash = await md5File(filePath);
 	const lastAsset = webstrates.assets.reduce((lastAsset, currentAsset) =>
 		(currentAsset.fileName === fileName && currentAsset.v > lastAsset.v)
@@ -53,6 +50,13 @@ const upload = async (host, filePath, attempts = 0) => {
 	if (!shouldUpload) {
 		console.log(chalk.cyan('◈'), 'Skipping asset', chalk.bold(fileName),
 			'- already available on the server.', chalk.gray('(' + fileHash + ')'));
+		return;
+	}
+
+	// If we don't have access to upload assets, we stop.
+	if (!webstrates.httpAccess) {
+		console.error(chalk.red(chalk.bold('!')), 'Error: No HTTP access, unable to upload asset '
+		+ fileName + '.', attempts);
 		return;
 	}
 

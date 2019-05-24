@@ -18,7 +18,7 @@ const sleep = (delay) => new Promise(accept => setTimeout(accept, delay));
  *                             caller.
  * @public
  */
-const download = async (host, webstrateId, assetName, assetPath) =>
+const download = async (host, tokenQuery, webstrateId, assetName, assetPath) =>
 	new Promise(async (accept, reject) => {
 		// Wait for httpAccess to be defined.
 		let attempts = 100;
@@ -36,13 +36,22 @@ const download = async (host, webstrateId, assetName, assetPath) =>
 		// If we don't have access to upload assets, we stop.
 		if (!webstrates.httpAccess) return;
 
-		const source = `${host}${assetName}`;
+		console.log(host);
+		const source = `${host}${assetName}${tokenQuery}`;
 		const destination = path.join(assetPath, assetName);
 
 		const file = fs.createWriteStream(destination);
 		const lib = (source.startsWith('https:') ? https : http);
-		lib.get(source, (response) => {
-			response.pipe(file);
+		lib.get(source, (res) => {
+			if (res.statusCode !== 200) {
+				let body = '';
+				res.on('data', (chunk) => body += chunk);
+				res.on('end', () =>
+					console.error(chalk.red(chalk.bold('!')),
+						'Error: Failed to download asset `' + assetName + '`:', body));
+				return;
+			}
+			res.pipe(file);
 			file.on('finish', () => {
 				file.close();
 				console.log(chalk.cyan('◈'), 'Downloaded asset', assetName);

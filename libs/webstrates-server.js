@@ -151,7 +151,11 @@ module.exports.save = async (jsonml) => {
 	try {
 		await submitOp(ops);
 	} catch (e) {
-		console.warn(timestamp(), 'Invalid document, rebuilding.', e);
+		if (e.code === 4001) {
+			console.warn(timestamp(), chalk.red(chalk.bold('!')), 'Forbidden');
+			return;
+		}
+		console.warn(timestamp(), chalk.yellow('!'), 'Invalid document, rebuilding.', e);
 		ops = [{ 'p': [], 'oi': [ 'html', {}, [ 'body', {} ]]}];
 		await submitOp(ops);
 	}

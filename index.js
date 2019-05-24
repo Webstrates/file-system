@@ -20,8 +20,10 @@ const args = argv._;
 const WEBSTRATE_ID = argv.webstrateId || argv.id;
 const HOST = argv.host || argv.h || 'web:strate@localhost:7007';
 const SECURE = !(argv.insecure || argv.i);
+const TOKEN = argv.token || argv.t;
+const TOKEN_QUERY = (TOKEN ? '?token=' + TOKEN : '');
 const WEB_HOST = (SECURE ? 'https://' : 'http://') + HOST + '/' + WEBSTRATE_ID + '/';
-const SOCKET_HOST = (SECURE ? 'wss://' : 'ws://') + HOST + '/ws/';
+const SOCKET_HOST = (SECURE ? 'wss://' : 'ws://') + HOST + '/' + WEBSTRATE_ID + '/' + TOKEN_QUERY;
 // Whether to terminate immediately after compiling and submitting the index.html.
 const ONE_SHOT = argv.oneshot || argv.n || false;
 global.DOWNLOAD_ASSETS = argv['download-assets'] || false;
@@ -31,7 +33,7 @@ if (!WEBSTRATE_ID) {
 	process.exit(1);
 }
 
-webstrates.checkAccess(WEB_HOST);
+webstrates.checkAccess(WEB_HOST + TOKEN_QUERY);
 
 const MOUNT_PATH = path.resolve(args[0] || WEBSTRATE_ID);
 const fileManager = FileManager(MOUNT_PATH);
@@ -55,6 +57,8 @@ fileManager.onChange(async (type, activePath, readFile) => {
 	const fileName = path.basename(activePath);
 	if (type === 'primary' && fileName === 'index.html') {
 		let html = readFile();
+		if (!html) return;
+
 		jsonml = normalizeJson(htmlToJsonMl(html));
 
 		// We extract any resources by (side effect) that might have been added manually to index.html.
@@ -80,7 +84,18 @@ fileManager.onChange(async (type, activePath, readFile) => {
 		hasSubmittedOurs = true;
 	}
 	else if (type === 'asset') {
-		await assetUploader.upload(WEB_HOST, activePath);
+		const assetName = path.basename(activePath);
+		if (fileManager.ignoreList.has(assetName)) {
+			// If the file is in the ignore list, it's because the file is already being uploaded or it has
+			// just been downloaded, so we don't want to reupload it.
+			return;
+		}
+		// Add file to the fileManager's ignore list, so it doesn't trigger an upload.
+		fileManager.ignoreList.add(assetName);
+		await assetUploader.upload(WEB_HOST + TOKEN_QUERY, activePath);
+		// Remove from the ignore list. We delay it, to ensure the fileManager has picked up on the write
+		// (and ignored it).
+		setTimeout(() => fileManager.ignoreList.delete(assetName), 5 * 1000);
 	}
 	else if (type === 'resource') {
 		const resource = readFile();
@@ -126,7 +141,7 @@ webstrates.onChange((jsonml) => {
 
 webstrates.onClose((event) => {
 	console.log('Reconnecting');
-	webstrates.connect(SOCKET_HOST, WEBSTRATE_ID);
+	setTimeout(() => webstrates.connect(SOCKET_HOST, WEBSTRATE_ID), 1000);
 });
 
 // Download assets to disk if --download-assets flag is set.
@@ -137,9 +152,14 @@ if (global.DOWNLOAD_ASSETS) {
 
 		for (let i=0; i < assetNames.length; i++) {
 			const assetName = assetNames[i];
+			if (fileManager.ignoreList.has(assetName)) {
+				// If the file is in the ignore list, it's because it has just been uploaded, so we don't want to
+				// redownload it.
+				return;
+			}
 			// Add file to the fileManager's ignore list, so it doesn't trigger an upload.
 			fileManager.ignoreList.add(assetName);
-			await assetDownloader.download(WEB_HOST, WEBSTRATE_ID, assetName, fileManager.assetPath());
+			await assetDownloader.download(WEB_HOST, TOKEN_QUERY, WEBSTRATE_ID, assetName, fileManager.assetPath(), );
 			// Remove from the ignore list. We delay it, to ensure the fileManager has picked up on the write
 			// (and ignored it).
 			setTimeout(() => fileManager.ignoreList.delete(assetName), 5 * 1000);

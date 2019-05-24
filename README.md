@@ -67,6 +67,10 @@ NB: Remember to set up your editor to auto-reload the file on changes.
 
 By default, files found in the `assets/` folder are uploaded, but existing assets from the server aren't downloaded. When using `--download-assets`, WFS will download (the newest version of) all assets on the server when connecting and continuously listen for new assets and download them as well to maintain a local copy.
 
+**Using access tokens**
+
+To access a webstrate proteced through the [permissions system](https://webstrates.github.io/userguide/api/permissions.html), users may supply WFS with an [access token](https://webstrates.github.io/userguide/api/access-tokens.html). Generate an access token, then run WFS with `--token=<token>`. Editing a webstrate, as well as uploading and downloading assets will now be possible.
+
 ## How?
 
 The brief story: WFS creates a websocket to the Webstrates server, acting exactly as a regular Webstrates client. When the document comes in (or any updates to it), the JsonML document gets converted to HTML (like when accessing a Webstrate document with the [`?raw` parameter](https://webstrates.github.io/userguide/http-api.html#accessing-the-history-of-a-webstrate)) and put it in a file. WFS listens for changes to the file, converts the HTML back to JsonML, calculates an [op diff between the two JsonML structures](https://github.com/kbadk/json0-ot-diff) and submits it to the server.

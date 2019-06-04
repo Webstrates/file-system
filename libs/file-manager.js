@@ -34,7 +34,6 @@ const watchPath = (watchPath) => {
 		const stat = fs.lstatSync(activePath);
 		if (!stat.isFile()) return;
 
-		console.log(event, activePath);
 		onChangeHandler(type, activePath, () => fs.readFileSync(activePath, 'utf8'));
 	});
 };

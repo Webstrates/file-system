@@ -24,7 +24,7 @@ const shorten = (str, col = process.stdout.column - 3) => (
  * @private
  */
 const createWebsocket = (host) => {
-	return new W3WebSocket(host,
+	return new W3WebSocket(host+"?ws-no-cache",
 		// 4 times "undefined" is the perfect amount.
 		undefined, undefined, undefined, undefined, {
 			maxReceivedFrameSize: 1024 * 1024 * 20 // 20 MB
